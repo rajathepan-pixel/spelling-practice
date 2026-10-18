@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f6f3ec">
+    <title>Spelling Practice</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="page-header">
+        <p class="eyebrow">A little practice, one word at a time</p>
+        <h1>Spelling Practice</h1>
+        <p class="intro">Listen to each word, then spell it from memory.</p>
+      </header>
+
+      <section class="card profile-card" id="profile-panel">
+        <h2>Your learner profile</h2>
+        <label class="field-label" for="profile-select">Choose who is practicing</label>
+        <div class="profile-controls">
+          <select id="profile-select" aria-describedby="profile-message"></select>
+          <button class="button button-secondary profile-delete" id="delete-profile-button" type="button">Delete profile</button>
+        </div>
+        <form class="create-profile-form" id="create-profile-form">
+          <label class="field-label" for="new-profile-name">Create a profile</label>
+          <div class="profile-controls">
+            <input id="new-profile-name" maxlength="40" type="text" placeholder="Name" autocomplete="off">
+            <button class="button button-primary profile-create" type="submit">Add profile</button>
+          </div>
+        </form>
+        <p class="message" id="profile-message" role="alert" aria-live="polite"></p>
+        <div class="profile-progress" id="profile-progress" hidden>
+          <p><strong id="profile-xp">0 XP</strong><span id="profile-review-count">0 words to review</span></p>
+          <div>
+            <h3>Badges</h3>
+            <ul id="profile-badges"></ul>
+          </div>
+        </div>
+        <p class="helper">Profiles and progress are stored in this browser on this device.</p>
+        <p class="helper">Earn 10 XP the first time you spell a word correctly on your first try. Every 3 correct answers in a row adds 5 bonus XP. Badges reward your first quiz, a perfect quiz, and a 5-word streak. Review attempts earn no XP.</p>
+      </section>
+
+      <section class="card setup-card" id="setup">
+        <label class="field-label" for="language">Default language for untagged words</label>
+        <select id="language">
+          <option value="en-US">English</option>
+          <option value="fr-FR">Français</option>
+        </select>
+
+        <label class="field-label words-label" for="word-list">Your words</label>
+        <textarea id="word-list" rows="9" placeholder="One word per line&#10;en: apple&#10;fr: bonjour&#10;fr: école" spellcheck="false" autocomplete="off"></textarea>
+        <p class="helper">Add one word per line. Use en: or fr: to set a word’s language; untagged words use the default above. Empty lines are ignored.</p>
+        <p class="message" id="setup-message" role="alert" aria-live="polite"></p>
+        <button class="button button-primary" id="start-button" type="button">Start quiz</button>
+      </section>
+
+      <section class="card quiz-card" id="quiz" hidden>
+        <div class="quiz-topline">
+          <p class="progress" id="progress"></p>
+          <p class="score" id="score"></p>
+        </div>
+        <div class="prompt-panel">
+          <p class="prompt-label">Listen to the word</p>
+          <button class="button button-replay" id="replay-button" type="button" aria-label="Replay spoken word">
+            <span aria-hidden="true">↻</span> Replay
+          </button>
+          <p class="voice-status" id="voice-status" role="status" aria-live="polite"></p>
+        </div>
+        <form id="answer-form" autocomplete="off">
+          <label class="field-label" for="answer">Your spelling</label>
+          <input id="answer" name="answer" type="text" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" aria-describedby="answer-feedback">
+          <p class="feedback" id="answer-feedback" aria-live="polite"></p>
+          <button class="button button-primary" id="submit-button" type="submit">Check spelling</button>
+        </form>
+      </section>
+
+      <section class="card results-card" id="results" hidden>
+        <p class="eyebrow">Quiz complete</p>
+        <h2 id="results-heading"></h2>
+        <h3 class="results-breakdown-heading">Correct spelling by language</h3>
+        <div class="results-breakdown" aria-label="Correct answers by language">
+          <p><span>English</span><strong id="english-result"></strong></p>
+          <p><span>Français</span><strong id="french-result"></strong></p>
+        </div>
+        <p class="results-detail" id="results-detail"></p>
+        <p class="xp-earned" id="xp-earned"></p>
+        <div class="answer-review">
+          <section aria-labelledby="correct-words-heading">
+            <h3 id="correct-words-heading">Words spelled correctly</h3>
+            <ul id="correct-words"></ul>
+          </section>
+          <section aria-labelledby="incorrect-words-heading">
+            <h3 id="incorrect-words-heading">Words to practice</h3>
+            <ul id="incorrect-words"></ul>
+          </section>
+        </div>
+        <button class="button button-primary" id="review-missed-button" type="button" hidden>Review missed words</button>
+        <button class="button button-primary" id="restart-button" type="button">Practice again</button>
+        <button class="button button-secondary" id="edit-list-button" type="button">Edit word list</button>
+      </section>
+      <p class="app-note">Spelling is checked after you submit. No autocorrect or spelling suggestions.</p>
+    </main>
+  </body>
+</html>
