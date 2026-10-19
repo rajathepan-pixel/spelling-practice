@@ -7,6 +7,7 @@ const profileMessage = document.querySelector("#profile-message");
 const profileProgress = document.querySelector("#profile-progress");
 const languageSelect = document.querySelector("#language");
 const wordList = document.querySelector("#word-list");
+const forestMap = document.querySelector("#forest-map");
 const setupMessage = document.querySelector("#setup-message");
 const answerForm = document.querySelector("#answer-form");
 const answerInput = document.querySelector("#answer");
@@ -18,6 +19,20 @@ const voiceStatus = document.querySelector("#voice-status");
 const reviewMissedButton = document.querySelector("#review-missed-button");
 
 const STORAGE_KEY = "spelling-practice-profiles-v1";
+const FOREST_LEVELS = [
+  { name: "Whispering Woods", icon: "🌲" },
+  { name: "Pebble Path", icon: "🪨" },
+  { name: "Mushroom Meadow", icon: "🍄" },
+  { name: "Bramble Bridge", icon: "🌿" },
+  { name: "Moonlit Hollow", icon: "🌙" },
+];
+const FOREST_MONSTERS = [
+  { name: "Mossy Muncher", art: "👾" },
+  { name: "Wiggly Worm", art: "🐛" },
+  { name: "Grumpy Mushroom", art: "🍄" },
+  { name: "Bramble Beast", art: "🐻" },
+  { name: "Bouncy Bog Blob", art: "🟢" },
+];
 const BADGE_DEFINITIONS = {
   firstQuiz: "First quiz",
   streakFive: "5-word streak",
@@ -27,7 +42,6 @@ let profiles = [];
 let currentProfileId = "";
 let storageAvailable = true;
 let quizWords = [];
-let currentIndex = 0;
 let correctCount = 0;
 let correctByLanguage = { "en-US": 0, "fr-FR": 0 };
 let language = "en-US";
@@ -37,6 +51,11 @@ let currentStreak = 0;
 let sessionXp = 0;
 let isReviewRound = false;
 let sessionBadges = [];
+let battleQueue = [];
+let activeWord = null;
+let defeatedCount = 0;
+let currentLevel = 1;
+let selectedLevel = 1;
 
 function loadProfiles() {
   try {
@@ -57,6 +76,7 @@ function loadProfiles() {
         profile.missedWords.every(validWord) &&
         Array.isArray(profile.attemptedWords) &&
         profile.attemptedWords.every((key) => typeof key === "string") &&
+        (!profile.wordBank || (Array.isArray(profile.wordBank) && profile.wordBank.every(validWord))) &&
         Number.isFinite(profile.quizzesCompleted) &&
         Number.isFinite(profile.bestStreak);
       if (
@@ -67,6 +87,17 @@ function loadProfiles() {
         throw new Error("Saved profile data has an invalid format.");
       }
       profiles = data.profiles;
+      profiles.forEach((profile) => {
+        if (!Number.isInteger(profile.highestForestLevel) || profile.highestForestLevel < 1) {
+          profile.highestForestLevel = 1;
+        }
+        if (!Array.isArray(profile.clearedForestLevels)) {
+          profile.clearedForestLevels = [];
+        }
+        if (!Array.isArray(profile.wordBank)) {
+          profile.wordBank = [];
+        }
+      });
       currentProfileId = data.currentProfileId;
       if (!profiles.some((profile) => profile.id === currentProfileId)) {
         currentProfileId = profiles.length ? profiles[0].id : "";
@@ -104,6 +135,9 @@ function createProfile(name) {
     badges: [],
     missedWords: [],
     attemptedWords: [],
+    wordBank: [],
+    highestForestLevel: 1,
+    clearedForestLevels: [],
     quizzesCompleted: 0,
     bestStreak: 0,
   };
@@ -201,7 +235,10 @@ async function speakCurrentWord() {
     return;
   }
 
-  const currentWord = quizWords[currentIndex];
+  const currentWord = activeWord;
+  if (!currentWord) {
+    return;
+  }
   const languagePrefix = currentWord.language.split("-")[0].toLowerCase();
   const matchingVoices = voices.filter((voice) =>
     voice.lang.toLowerCase().startsWith(`${languagePrefix}-`) ||
@@ -239,19 +276,31 @@ function wordKey(word) {
 }
 
 function showQuestion() {
+  activeWord = battleQueue[0];
+  if (!activeWord) {
+    showResults();
+    return;
+  }
   submitted = false;
   answerInput.value = "";
   answerInput.disabled = false;
   answerFeedback.textContent = "";
   answerFeedback.className = "feedback";
-  submitButton.textContent = "Check spelling";
-  progress.textContent = `${isReviewRound ? "Review" : "Word"} ${currentIndex + 1} of ${quizWords.length}`;
-  scoreDisplay.textContent = `Correct: ${correctCount} · Streak: ${currentStreak} · XP this quiz: ${sessionXp}`;
+  submitButton.textContent = "Spell the word";
+  progress.textContent = `${FOREST_LEVELS[currentLevel - 1].name} · Monsters defeated: ${defeatedCount} / ${quizWords.length}`;
+  scoreDisplay.textContent = `First-try words: ${correctCount} · Streak: ${currentStreak} · XP: ${sessionXp}`;
+  const monster = FOREST_MONSTERS[(activeWord.encounterIndex + currentLevel - 1) % FOREST_MONSTERS.length];
+  document.querySelector("#monster-art").textContent = monster.art;
+  document.querySelector("#monster-name").textContent = monster.name;
+  document.querySelector("#monster-health").textContent =
+    activeWord.mistakes.length ? "Still bouncing! Try again later." : "Ready to battle!";
+  document.querySelector("#prompt-label").textContent =
+    "Spell the word to defeat the monster!";
   answerInput.focus();
   speakCurrentWord();
 }
 
-function startQuiz(review = false) {
+function showForestMap() {
   const profile = activeProfile();
   if (!profile) {
     setupMessage.textContent = "Create or choose a learner profile first.";
@@ -259,28 +308,111 @@ function startQuiz(review = false) {
   }
 
   language = languageSelect.value;
-  const list = review
-    ? profile.missedWords.map((word) => ({ ...word }))
-    : parseWordList(wordList.value, language);
-
+  const list = parseWordList(wordList.value, language);
   if (list.length === 0) {
-    setupMessage.textContent = review
-      ? "There are no missed words to review."
-      : "Enter at least one word to start.";
+    setupMessage.textContent = "Enter at least one word to explore the forest.";
     return;
   }
 
   setupMessage.textContent = "";
+  profile.wordBank = list.map((word) => ({ text: word.text, language: word.language }));
+  saveProfiles();
+  renderForestMap();
+  setup.hidden = true;
+  forestMap.hidden = false;
+}
+
+function renderForestMap() {
+  const profile = activeProfile();
+  const levelList = document.querySelector("#forest-levels");
+  levelList.replaceChildren();
+  if (!profile) {
+    return;
+  }
+
+  const clearedLevels = new Set(profile.clearedForestLevels);
+  selectedLevel = Math.min(
+    Math.max(selectedLevel, 1),
+    Math.min(profile.highestForestLevel, FOREST_LEVELS.length)
+  );
+  document.querySelector("#map-intro").textContent =
+    `Spark has ${profile.wordBank.length} word${profile.wordBank.length === 1 ? "" : "s"} to practice. Spell each one to defeat a silly monster. Your word list follows Spark into every new forest area.`;
+
+  FOREST_LEVELS.forEach((level, index) => {
+    const levelNumber = index + 1;
+    const unlocked = levelNumber <= profile.highestForestLevel;
+    const item = unlocked ? document.createElement("button") : document.createElement("div");
+    item.className = `forest-level${levelNumber === selectedLevel ? " selected" : ""}`;
+    if (unlocked) {
+      item.type = "button";
+      item.setAttribute("aria-pressed", String(levelNumber === selectedLevel));
+      item.addEventListener("click", () => {
+        selectedLevel = levelNumber;
+        renderForestMap();
+      });
+    } else {
+      item.setAttribute("aria-disabled", "true");
+    }
+    const icon = document.createElement("span");
+    icon.className = "level-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = unlocked ? level.icon : "🔒";
+    const copy = document.createElement("span");
+    copy.className = "forest-level-copy";
+    const title = document.createElement("strong");
+    title.textContent = `Level ${levelNumber}: ${level.name}`;
+    const status = document.createElement("span");
+    status.textContent = clearedLevels.has(levelNumber)
+      ? "Forest cleared!"
+      : unlocked
+        ? "Ready to explore"
+        : "Defeat every monster in the previous level to unlock";
+    copy.append(title, status);
+    item.append(icon, copy);
+    levelList.append(item);
+  });
+
+  const startLevelButton = document.querySelector("#start-level-button");
+  startLevelButton.disabled = profile.wordBank.length === 0;
+  startLevelButton.textContent = `Enter Level ${selectedLevel}: ${FOREST_LEVELS[selectedLevel - 1].name}`;
+}
+
+function startQuiz(review = false) {
+  const profile = activeProfile();
+  const source = review
+    ? profile?.missedWords.map((word) => ({ text: word.text, language: word.language }))
+    : profile?.wordBank.map((word) => ({ ...word }));
+  if (!profile || !source || source.length === 0) {
+    profileMessage.textContent = review
+      ? "There are no missed words to review."
+      : "Add a profile and word list before starting.";
+    return;
+  }
+
   isReviewRound = review;
-  quizWords = shuffled(list);
-  currentIndex = 0;
+  currentLevel = selectedLevel;
+  quizWords = shuffled(source).map((word, index) => ({
+    ...word,
+    id: `${word.language}:${word.text}:${index}`,
+    encounterIndex: index,
+    answer: "",
+    isCorrect: false,
+    firstTryCorrect: null,
+    mistakes: [],
+    defeated: false,
+    tries: 0,
+  }));
+  battleQueue = [...quizWords];
   correctCount = 0;
   correctByLanguage = { "en-US": 0, "fr-FR": 0 };
   currentStreak = 0;
   sessionXp = 0;
   sessionBadges = [];
+  defeatedCount = 0;
+  activeWord = null;
   profilePanel.hidden = true;
   setup.hidden = true;
+  forestMap.hidden = true;
   results.hidden = true;
   quiz.hidden = false;
   showQuestion();
@@ -296,7 +428,7 @@ function renderAnswerReview() {
     const item = document.createElement("li");
     const languageName = word.language === "fr-FR" ? "Français" : "English";
 
-    if (word.isCorrect) {
+    if (word.firstTryCorrect) {
       item.textContent = `${word.text} (${languageName})`;
       correctList.append(item);
       return;
@@ -308,7 +440,7 @@ function renderAnswerReview() {
     correction.textContent = `Correct spelling: ${word.text}`;
     const answer = document.createElement("span");
     answer.className = "misspelled-answer";
-    answer.textContent = `Your answer: ${word.answer || "(no answer)"}`;
+    answer.textContent = `Your answer: ${word.mistakes[0] || "(not correct on the first try)"}`;
     item.append(label, correction, document.createElement("br"), answer);
     incorrectList.append(item);
   });
@@ -323,7 +455,7 @@ function renderAnswerReview() {
   if (incorrectList.childElementCount === 0) {
     const emptyMessage = document.createElement("li");
     emptyMessage.className = "empty-review";
-    emptyMessage.textContent = "No words to practice. Great work!";
+    emptyMessage.textContent = "No first-try mistakes. Great work!";
     incorrectList.append(emptyMessage);
   }
 }
@@ -336,30 +468,47 @@ function showResults() {
   quiz.hidden = true;
   results.hidden = false;
   profilePanel.hidden = false;
+  document.querySelector("#results-eyebrow").textContent =
+    isReviewRound ? "Review complete" : "Forest level complete";
   document.querySelector("#results-heading").textContent =
-    `${correctCount} out of ${quizWords.length} words spelled correctly`;
+    isReviewRound
+      ? `${correctCount} out of ${quizWords.length} review words spelled correctly on the first try`
+      : `${FOREST_LEVELS[currentLevel - 1].name} cleared!`;
   const totalByLanguage = quizWords.reduce((totals, word) => {
     totals[word.language] += 1;
     return totals;
   }, { "en-US": 0, "fr-FR": 0 });
   document.querySelector("#english-result").textContent =
-    `${correctByLanguage["en-US"]} out of ${totalByLanguage["en-US"]} English words spelled correctly`;
+    `${correctByLanguage["en-US"]} out of ${totalByLanguage["en-US"]} English words correct on the first try`;
   document.querySelector("#french-result").textContent =
-    `${correctByLanguage["fr-FR"]} out of ${totalByLanguage["fr-FR"]} French words spelled correctly`;
+    `${correctByLanguage["fr-FR"]} out of ${totalByLanguage["fr-FR"]} French words correct on the first try`;
   document.querySelector("#results-detail").textContent =
     correctCount === quizWords.length
-      ? "Perfect score. Nicely done!"
-      : "Keep practicing. You can shuffle the same list and try again.";
+      ? "Perfect spelling! Every monster was defeated without a first-try mistake."
+      : `Spark defeated all ${quizWords.length} monsters. You needed another try on ${quizWords.length - correctCount} word${quizWords.length - correctCount === 1 ? "" : "s"}. See your first-try mistakes below.`;
 
   const profile = activeProfile();
   const newlyEarned = [...sessionBadges];
+  let unlockMessage = "Review complete. Keep practicing with Spark!";
   if (!isReviewRound && profile) {
     profile.quizzesCompleted += 1;
+    if (!profile.clearedForestLevels.includes(currentLevel)) {
+      profile.clearedForestLevels.push(currentLevel);
+    }
+    if (currentLevel < FOREST_LEVELS.length && profile.highestForestLevel === currentLevel) {
+      profile.highestForestLevel += 1;
+      unlockMessage = `Level ${profile.highestForestLevel} unlocked: ${FOREST_LEVELS[profile.highestForestLevel - 1].name}!`;
+    } else if (currentLevel === FOREST_LEVELS.length) {
+      unlockMessage = "Spark explored the whole forest! You can replay any forest level.";
+    } else {
+      unlockMessage = "Level cleared! You can replay this trail or explore the next one.";
+    }
     awardBadge("firstQuiz", newlyEarned);
     if (correctCount === quizWords.length) {
       awardBadge("perfectQuiz", newlyEarned);
     }
   }
+  document.querySelector("#forest-unlock").textContent = unlockMessage;
 
   const badgeMessage = newlyEarned.length ? ` New badge: ${newlyEarned.join(", ")}!` : "";
   document.querySelector("#xp-earned").textContent =
@@ -367,6 +516,7 @@ function showResults() {
       ? `Review complete. No XP is awarded for review attempts.${badgeMessage}`
       : `You earned ${sessionXp} XP this quiz.${badgeMessage}`;
   reviewMissedButton.hidden = !profile || profile.missedWords.length === 0;
+  document.querySelector("#map-button").textContent = "Explore the forest";
   renderAnswerReview();
   renderProfiles();
   saveProfiles();
@@ -452,8 +602,14 @@ document.querySelector("#create-profile-form").addEventListener("submit", (event
 
 profileSelect.addEventListener("change", () => {
   currentProfileId = profileSelect.value;
+  selectedLevel = 1;
+  const profile = activeProfile();
+  wordList.value = (profile?.wordBank || [])
+    .map((word) => `${word.language === "fr-FR" ? "fr" : "en"}: ${word.text}`)
+    .join("\n");
   saveProfiles();
   renderProfiles();
+  renderForestMap();
 });
 
 document.querySelector("#delete-profile-button").addEventListener("click", () => {
@@ -463,28 +619,50 @@ document.querySelector("#delete-profile-button").addEventListener("click", () =>
   }
   profiles = profiles.filter((candidate) => candidate.id !== profile.id);
   currentProfileId = profiles.length ? profiles[0].id : "";
+  const selectedProfile = activeProfile();
+  wordList.value = (selectedProfile?.wordBank || [])
+    .map((word) => `${word.language === "fr-FR" ? "fr" : "en"}: ${word.text}`)
+    .join("\n");
   saveProfiles();
   renderProfiles();
+  renderForestMap();
 });
 
 loadProfiles();
 if (storageAvailable) {
   renderProfiles();
+  const profile = activeProfile();
+  wordList.value = (profile?.wordBank || [])
+    .map((word) => `${word.language === "fr-FR" ? "fr" : "en"}: ${word.text}`)
+    .join("\n");
 } else {
   document.querySelector("#start-button").disabled = true;
   document.querySelector("#delete-profile-button").disabled = true;
 }
 
-document.querySelector("#start-button").addEventListener("click", () => startQuiz());
+document.querySelector("#start-button").addEventListener("click", showForestMap);
+document.querySelector("#start-level-button").addEventListener("click", () => startQuiz());
 document.querySelector("#replay-button").addEventListener("click", speakCurrentWord);
 reviewMissedButton.addEventListener("click", () => startQuiz(true));
+document.querySelector("#change-words-button").addEventListener("click", () => {
+  forestMap.hidden = true;
+  setup.hidden = false;
+});
+document.querySelector("#map-button").addEventListener("click", () => {
+  results.hidden = true;
+  renderForestMap();
+  forestMap.hidden = false;
+});
 
 answerForm.addEventListener("submit", (event) => {
   event.preventDefault();
 
   if (submitted) {
-    currentIndex += 1;
-    if (currentIndex === quizWords.length) {
+    battleQueue.shift();
+    if (activeWord && !activeWord.defeated) {
+      battleQueue.push(activeWord);
+    }
+    if (battleQueue.length === 0) {
       showResults();
     } else {
       showQuestion();
@@ -492,12 +670,13 @@ answerForm.addEventListener("submit", (event) => {
     return;
   }
 
-  const expected = quizWords[currentIndex];
+  const expected = activeWord;
   const isCorrect =
     normalizeSpelling(answerInput.value, expected.language) ===
     normalizeSpelling(expected.text, expected.language);
-  expected.answer = answerInput.value.trim();
-  expected.isCorrect = isCorrect;
+  const enteredAnswer = answerInput.value.trim();
+  expected.tries += 1;
+  const firstTry = expected.tries === 1;
   const profile = activeProfile();
   let firstAttempt = false;
   if (!isReviewRound && profile) {
@@ -508,10 +687,17 @@ answerForm.addEventListener("submit", (event) => {
     }
   }
   if (isCorrect) {
-    correctCount += 1;
-    correctByLanguage[expected.language] += 1;
-    currentStreak += 1;
-    if (!isReviewRound && profile && firstAttempt) {
+    expected.defeated = true;
+    expected.isCorrect = true;
+    defeatedCount += 1;
+    if (firstTry) {
+      expected.firstTryCorrect = true;
+      expected.answer = enteredAnswer;
+      correctCount += 1;
+      correctByLanguage[expected.language] += 1;
+    }
+    if (!isReviewRound && profile && firstAttempt && firstTry) {
+      currentStreak += 1;
       let earned = 10;
       if (currentStreak % 3 === 0) {
         earned += 5;
@@ -524,25 +710,36 @@ answerForm.addEventListener("submit", (event) => {
       }
     }
     updateMissedWords(expected, true);
-    answerFeedback.textContent = `Correct! The word is “${expected.text}”.`;
+    answerFeedback.textContent = firstTry
+      ? `Correct! Spark defeated the monster with “${expected.text}”!`
+      : `That’s it! Spark defeated the monster with “${expected.text}”.`;
     answerFeedback.className = "feedback correct";
+    document.querySelector("#monster-health").textContent = "Monster defeated!";
   } else {
+    if (firstTry) {
+      expected.firstTryCorrect = false;
+      expected.answer = enteredAnswer;
+    }
+    expected.mistakes.push(enteredAnswer || "(no answer)");
     currentStreak = 0;
     updateMissedWords(expected, false);
-    answerFeedback.textContent = `Not quite. The correct spelling is “${expected.text}”.`;
+    answerFeedback.textContent =
+      `Oops! The correct spelling is “${expected.text}”. Spark will bring this monster back for another try.`;
     answerFeedback.className = "feedback incorrect";
+    document.querySelector("#monster-health").textContent = "Not defeated yet!";
   }
 
   saveProfiles();
   renderProfiles();
   submitted = true;
   answerInput.disabled = true;
-  submitButton.textContent = currentIndex + 1 === quizWords.length ? "See results" : "Next word";
-  scoreDisplay.textContent = `Correct: ${correctCount} · Streak: ${currentStreak} · XP this quiz: ${sessionXp}`;
+  submitButton.textContent = "Continue adventure";
+  progress.textContent =
+    `${FOREST_LEVELS[currentLevel - 1].name} · Monsters defeated: ${defeatedCount} / ${quizWords.length}`;
+  scoreDisplay.textContent = `First-try words: ${correctCount} · Streak: ${currentStreak} · XP: ${sessionXp}`;
   submitButton.focus();
 });
 
-document.querySelector("#restart-button").addEventListener("click", () => startQuiz());
 document.querySelector("#edit-list-button").addEventListener("click", () => {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();

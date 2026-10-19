@@ -53,7 +53,16 @@
         <textarea id="word-list" rows="9" placeholder="One word per line&#10;en: apple&#10;fr: bonjour&#10;fr: école" spellcheck="false" autocomplete="off"></textarea>
         <p class="helper">Add one word per line. Use en: or fr: to set a word’s language; untagged words use the default above. Empty lines are ignored.</p>
         <p class="message" id="setup-message" role="alert" aria-live="polite"></p>
-        <button class="button button-primary" id="start-button" type="button">Start quiz</button>
+        <button class="button button-primary" id="start-button" type="button">Choose your forest adventure</button>
+      </section>
+
+      <section class="card forest-map-card" id="forest-map" hidden>
+        <p class="eyebrow">Spark’s forest adventure</p>
+        <h2>The Whispering Forest</h2>
+        <p class="map-intro" id="map-intro"></p>
+        <div class="forest-map" id="forest-levels" aria-label="Forest levels"></div>
+        <button class="button button-primary" id="start-level-button" type="button" disabled>Choose an unlocked level</button>
+        <button class="button button-secondary" id="change-words-button" type="button">Change word list</button>
       </section>
 
       <section class="card quiz-card" id="quiz" hidden>
@@ -61,8 +70,21 @@
           <p class="progress" id="progress"></p>
           <p class="score" id="score"></p>
         </div>
+        <div class="battle-scene" aria-live="polite">
+          <div class="battle-character dragon-character">
+            <span class="character-art" aria-hidden="true">🐉</span>
+            <strong>Spark</strong>
+            <span class="character-caption">Your dragon</span>
+          </div>
+          <div class="battle-versus" aria-hidden="true">vs.</div>
+          <div class="battle-character monster-character">
+            <span class="character-art" id="monster-art" aria-hidden="true">👾</span>
+            <strong id="monster-name">Mossy Muncher</strong>
+            <span class="character-caption" id="monster-health">Ready to battle!</span>
+          </div>
+        </div>
         <div class="prompt-panel">
-          <p class="prompt-label">Listen to the word</p>
+          <p class="prompt-label" id="prompt-label">Spell the word to defeat the monster!</p>
           <button class="button button-replay" id="replay-button" type="button" aria-label="Replay spoken word">
             <span aria-hidden="true">↻</span> Replay
           </button>
@@ -77,9 +99,10 @@
       </section>
 
       <section class="card results-card" id="results" hidden>
-        <p class="eyebrow">Quiz complete</p>
+        <p class="eyebrow" id="results-eyebrow">Adventure complete</p>
         <h2 id="results-heading"></h2>
-        <h3 class="results-breakdown-heading">Correct spelling by language</h3>
+        <p class="forest-unlock" id="forest-unlock"></p>
+        <h3 class="results-breakdown-heading">Words spelled correctly on the first try</h3>
         <div class="results-breakdown" aria-label="Correct answers by language">
           <p><span>English</span><strong id="english-result"></strong></p>
           <p><span>Français</span><strong id="french-result"></strong></p>
@@ -88,16 +111,16 @@
         <p class="xp-earned" id="xp-earned"></p>
         <div class="answer-review">
           <section aria-labelledby="correct-words-heading">
-            <h3 id="correct-words-heading">Words spelled correctly</h3>
+            <h3 id="correct-words-heading">Words correct on the first try</h3>
             <ul id="correct-words"></ul>
           </section>
           <section aria-labelledby="incorrect-words-heading">
-            <h3 id="incorrect-words-heading">Words to practice</h3>
+            <h3 id="incorrect-words-heading">First-try mistakes to learn from</h3>
             <ul id="incorrect-words"></ul>
           </section>
         </div>
         <button class="button button-primary" id="review-missed-button" type="button" hidden>Review missed words</button>
-        <button class="button button-primary" id="restart-button" type="button">Practice again</button>
+        <button class="button button-primary" id="map-button" type="button">Explore the forest</button>
         <button class="button button-secondary" id="edit-list-button" type="button">Edit word list</button>
       </section>
       <p class="app-note">Spelling is checked after you submit. No autocorrect or spelling suggestions.</p>

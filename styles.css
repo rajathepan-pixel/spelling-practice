@@ -261,6 +261,12 @@ input:focus {
   transform: none;
 }
 
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
 .profile-controls .profile-delete,
 .profile-controls .profile-create {
   width: auto;
@@ -277,6 +283,135 @@ input:focus {
 
 .quiz-topline p {
   margin: 0;
+}
+
+.forest-map-card h2 {
+  font-size: 2rem;
+}
+
+.map-intro {
+  color: var(--muted);
+}
+
+.forest-map {
+  display: grid;
+  gap: 10px;
+  margin: 22px 0;
+}
+
+.forest-level {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #fff;
+  color: inherit;
+  text-align: left;
+}
+
+button.forest-level {
+  cursor: pointer;
+}
+
+button.forest-level:hover,
+.forest-level.selected {
+  border-color: var(--green);
+  background: #f2f5ed;
+}
+
+.forest-level:disabled {
+  color: var(--muted);
+  opacity: 0.62;
+}
+
+.level-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border-radius: 50%;
+  background: #e9eee1;
+  font-size: 1.3rem;
+}
+
+.forest-level-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.forest-level-copy span {
+  color: var(--muted);
+  font-size: 0.83rem;
+}
+
+.battle-scene {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 0;
+  padding: 18px 12px;
+  border: 1px solid #e9e8df;
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse at 20% 85%, #c4d8ac 0, transparent 42%),
+    linear-gradient(#e9f2e8, #f4f4e8);
+  text-align: center;
+}
+
+.battle-character {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.character-art {
+  display: block;
+  font-size: clamp(2.6rem, 12vw, 4.3rem);
+  line-height: 1.2;
+  filter: drop-shadow(0 5px 3px rgba(25, 70, 53, 0.13));
+  animation: bob 1.8s ease-in-out infinite;
+}
+
+.monster-character .character-art {
+  animation-delay: 0.3s;
+}
+
+.battle-character strong {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.character-caption {
+  color: var(--muted);
+  font-size: 0.77rem;
+}
+
+.battle-versus {
+  color: var(--green);
+  font-family: Georgia, serif;
+  font-size: 1rem;
+  font-style: italic;
+  font-weight: 700;
+}
+
+.forest-unlock {
+  margin: 12px 0 20px;
+  padding: 12px;
+  border-radius: 11px;
+  background: #f2f5ed;
+  color: var(--green-dark);
+  font-weight: 700;
+}
+
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 
 .prompt-panel {
@@ -451,5 +586,22 @@ input:focus {
   .profile-controls .profile-delete,
   .profile-controls .profile-create {
     width: 100%;
+  }
+
+  .battle-scene {
+    gap: 6px;
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
